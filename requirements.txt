@@ -4,7 +4,7 @@ requests==2.25.1
 scikit-learn==0.24.2
 gensim==4.0.1
 pytesseract==0.3.7
-Pillow==8.2.0
+Pillow==10.3.0
 textblob==0.15.3
 vaderSentiment==3.3.2
 networkx==2.5.1
