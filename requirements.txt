@@ -1,5 +1,5 @@
 numpy==1.21.0
-nltk==3.6.2
+nltk==3.8.1
 requests==2.25.1
 scikit-learn==1.5.0
 gensim==4.0.1
