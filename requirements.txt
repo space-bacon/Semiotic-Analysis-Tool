@@ -10,7 +10,7 @@ vaderSentiment==3.3.2
 networkx==2.5.1
 matplotlib==3.4.2
 seaborn==0.11.1
-transformers==4.50.0
+transformers==4.51.0
 torch==2.7.1
 fpdf==1.7.2
 discopy==1.1.3
