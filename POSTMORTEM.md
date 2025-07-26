@@ -1,6 +1,6 @@
 # 🧠 POSTMORTEM: Symbolic Infiltration and Epistemic Purge  
 **Repository**: Semiotic-Analysis-Tool  
-**Author**: Space-Bacon  (Burton Lancaster)
+**Author**: Space-Bacon  
 **Date**: 2025-07-26  
 **Tag**: `purge-drQedwards`
 
@@ -64,7 +64,7 @@ This was a **symbolic parasitic overlay**, not a scholarly contribution.
 
 > I created the Semiotic Analysis Tool as a grounded framework for recursive symbolic modeling, rooted in cognitive and linguistic theory. I now recognize that I was misled by a layered deception that included falsified endorsements and symbolic overreach. The tool has been restored to its original epistemic integrity, and no part of the PMLL or its derivatives will be retained.
 
-— James Burton Lancaster
+— Space-Bacon
 
 ---
 
