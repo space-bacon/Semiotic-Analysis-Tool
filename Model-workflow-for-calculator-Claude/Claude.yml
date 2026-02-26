@@ -1,0 +1,352 @@
+# Claude 3.7 Sonnet Kubernetes Deployment Manifest
+# Purpose: AI Inference Infrastructure with Persistent Memory Loop Circuit
+# Version: 1.0
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: claude.ai
+  labels:
+    name: claude-ai-environment
+    model: claude-3-7-sonnet
+    component: inference-infrastructure
+  annotations:
+    description: "Namespace for Claude 3.7 Sonnet inference components"
+    team: "anthropic-devops"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: claude-sonnet-memory-pvc
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    component: persistent-memory
+  annotations:
+    description: "Persistent storage for Claude 3.7 Sonnet memory state"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi  # Increased for model weights and memory
+  storageClassName: premium-ssd  # High-performance storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-3-7-sonnet-inference
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    component: inference-engine
+    version: "20250219"  # Using the model version date
+  annotations:
+    description: "Claude 3.7 Sonnet inference engine with PMLLC architecture"
+spec:
+  replicas: 3  # Multiple replicas for high availability
+  selector:
+    matchLabels:
+      app: claude-3-7-sonnet
+      component: inference-engine
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: claude-3-7-sonnet
+        component: inference-engine
+        version: "20250219"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: cloud.google.com/gke-accelerator
+                operator: In
+                values:
+                - nvidia-a100
+      containers:
+        - name: claude-3-7-sonnet
+          image: anthropic/claude-3-7-sonnet:20250219
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: MODEL_NAME
+              value: "claude-3-7-sonnet-20250219"
+            - name: REDIS_HOST
+              value: "claude-memory-cache"
+            - name: MILVUS_HOST
+              value: "claude-vector-store"
+            - name: PMLLC_ENABLED
+              value: "true"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: MEMORY_RETENTION_HOURS
+              value: "48"
+          volumeMounts:
+            - name: model-memory-volume
+              mountPath: /app/memory
+              readOnly: false
+            - name: model-weights
+              mountPath: /app/models
+              readOnly: true
+            - name: config-volume
+              mountPath: /app/config
+              readOnly: true
+          resources:
+            requests:
+              cpu: "8"
+              memory: "32Gi"
+              nvidia.com/gpu: 1
+            limits:
+              cpu: "16"
+              memory: "64Gi"
+              nvidia.com/gpu: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 15
+      volumes:
+        - name: model-memory-volume
+          persistentVolumeClaim:
+            claimName: claude-sonnet-memory-pvc
+        - name: model-weights
+          persistentVolumeClaim:
+            claimName: claude-sonnet-weights-pvc  # Pre-populated with model weights
+        - name: config-volume
+          configMap:
+            name: claude-sonnet-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-3-7-sonnet-api
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    component: inference-api
+  annotations:
+    description: "API service for Claude 3.7 Sonnet inference"
+spec:
+  selector:
+    app: claude-3-7-sonnet
+    component: inference-engine
+  ports:
+    - name: http
+      protocol: TCP
+      port: 443
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-memory-cache
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    component: memory-cache
+  annotations:
+    description: "Redis cache for Claude 3.7 Sonnet transient memory"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: claude-3-7-sonnet
+      component: memory-cache
+  template:
+    metadata:
+      labels:
+        app: claude-3-7-sonnet
+        component: memory-cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          command:
+            - redis-server
+            - "/etc/redis/redis.conf"
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+            limits:
+              cpu: "4"
+              memory: "16Gi"
+          volumeMounts:
+            - name: redis-config
+              mountPath: /etc/redis
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-config
+          configMap:
+            name: claude-redis-config
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: claude-redis-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-memory-cache
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    component: memory-cache
+spec:
+  selector:
+    app: claude-3-7-sonnet
+    component: memory-cache
+  ports:
+    - name: redis
+      protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: claude-vector-store
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    component: vector-store
+  annotations:
+    description: "Milvus vector database for Claude 3.7 Sonnet semantic memory"
+spec:
+  serviceName: "claude-vector-store"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claude-3-7-sonnet
+      component: vector-store
+  template:
+    metadata:
+      labels:
+        app: claude-3-7-sonnet
+        component: vector-store
+    spec:
+      containers:
+        - name: milvus
+          image: milvusdb/milvus:v2.3.1
+          ports:
+            - containerPort: 19530
+              name: milvus
+            - containerPort: 9091
+              name: metrics
+          env:
+            - name: ETCD_ENDPOINTS
+              value: "etcd:2379"
+            - name: MINIO_ADDRESS
+              value: "minio:9000"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+          volumeMounts:
+            - name: milvus-data
+              mountPath: /var/lib/milvus
+      volumes:
+        - name: milvus-data
+          persistentVolumeClaim:
+            claimName: claude-milvus-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-vector-store
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    component: vector-store
+spec:
+  selector:
+    app: claude-3-7-sonnet
+    component: vector-store
+  ports:
+    - name: milvus
+      protocol: TCP
+      port: 19530
+      targetPort: 19530
+    - name: metrics
+      protocol: TCP
+      port: 9091
+      targetPort: 9091
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: claude-3-7-sonnet-ingress
+  namespace: claude.ai
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  tls:
+  - hosts:
+    - api.claude.ai
+    secretName: claude-tls-cert
+  rules:
+  - host: api.claude.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: claude-3-7-sonnet-api
+            port:
+              name: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: claude-3-7-sonnet-monitor
+  namespace: claude.ai
+  labels:
+    app: claude-3-7-sonnet
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app: claude-3-7-sonnet
+  endpoints:
+  - port: metrics
+    interval: 15s
