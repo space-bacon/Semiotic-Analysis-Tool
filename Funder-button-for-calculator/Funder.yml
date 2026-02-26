@@ -1,0 +1,19 @@
+# Sponsor this project and its maintainers!
+# Visit https://github.com/sponsors for more info
+
+github: [drqsatoshin]                # Your GitHub Sponsors username(s)
+patreon: your-patreon-username       # Your Patreon username
+open_collective: your-collective     # Your Open Collective project name
+ko_fi: yourkofiusername              # Your Ko-fi username
+tidelift: npm/package-name           # Example: npm/babel or other supported registry
+community_bridge: project-name       # Example: cloud-foundry
+liberapay: your-liberapay            # Your Liberapay username
+issuehunt: your-issuehunt            # Your IssueHunt username
+lfx_crowdfunding: project-name       # Example: cloud-foundry
+polar: your-polar-username           # Your Polar username
+buy_me_a_coffee: yourbmcusername     # Your Buy Me a Coffee username
+thanks_dev: your-thanksdev           # Your thanks.dev username
+custom:
+  - "https://paypal.me/jtrompeter68"   # Replace with your PayPal.me link
+  - "https://yourpersonalwebsite.com/donate"
+  - "https://another-crowdfunding-site.com/yourpage"
